@@ -58,7 +58,7 @@ export function BusinessTaskWizard({ initialBusinessName = "Кофейня «Д�
     });
   }
   return <div className="space-y-6">
-    <p className="text-sm text-muted-foreground">Черновик → уточняющие вопросы → карточка → рейтинг и публикация</p>
+    <p className="text-sm text-muted-foreground">Черновик → вопросы → предварительный рейтинг → подтверждение карточки → публикация</p>
     {error && <p role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">{error}</p>}
     {pending && <p role="status">{pending} Ответ ИИ может занять около минуты.</p>}
     {task ? <TaskEditor key={task.id} initialTask={task} redirectAfterPublish /> : <Card><CardHeader><CardTitle>{analysis ? "Уточните задачу" : "Опишите задачу своими словами"}</CardTitle></CardHeader><CardContent>
