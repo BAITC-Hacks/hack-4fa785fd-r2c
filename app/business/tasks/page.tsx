@@ -1,15 +1,22 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { readDb } from "@/lib/store";
+import { RoleSchema } from "@/lib/types";
 import { PagePlaceholder } from "@/components/PagePlaceholder";
+import { TaskCard } from "@/components/TaskCard";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 
-export default function BusinessTasksPage() {
-  return (
-    <PagePlaceholder eyebrow="Кабинет бизнеса" title="Мои задачи" description="Здесь будут черновики и опубликованные задачи выбранного бизнеса, их рейтинг и отклики команд."
-      action={<Button asChild><Link href="/business/new">Создать задачу <span aria-hidden="true">+</span></Link></Button>}>
-      <div className="flex items-center gap-3 border-b pb-4"><span className="rounded-md bg-secondary px-3 py-2 text-sm font-medium text-primary">Все задачи</span><span className="text-sm text-muted-foreground">Данные ещё не подключены</span></div>
-      <Card className="border-dashed shadow-none"><CardContent className="flex min-h-72 flex-col items-center justify-center gap-4 py-12 text-center"><span aria-hidden="true" className="flex size-12 items-center justify-center rounded-xl bg-secondary text-2xl text-primary">+</span><h2 className="text-xl font-semibold">Место для ваших задач</h2><p className="max-w-lg text-sm leading-6 text-muted-foreground">Каркас списка готов. После подключения сохранения здесь появятся карточки, уровень готовности и переход к работе с откликами.</p><Button asChild variant="outline"><Link href="/business/tasks/demo">Посмотреть макет карточки</Link></Button></CardContent></Card>
-      <p className="placeholder-notice">Статус публикации и уровень готовности хранятся отдельно. Задача с низким рейтингом сможет участвовать в открытом каталоге.</p>
-    </PagePlaceholder>
-  );
+export const dynamic = "force-dynamic";
+export default async function BusinessTasksPage() {
+  const [db, cookieStore] = await Promise.all([readDb(), cookies()]);
+  let businessName = "Кофейня «Дала»";
+  try {
+    const role = RoleSchema.safeParse(JSON.parse(decodeURIComponent(cookieStore.get("taskready-role")?.value ?? "")));
+    if (role.success && role.data.kind === "business") businessName = role.data.businessName;
+  } catch { /* Default demo business. */ }
+  const tasks = db.tasks.filter((task) => task.businessName === businessName).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return <PagePlaceholder placeholder={false} eyebrow="Кабинет бизнеса" title="Мои задачи" description={businessName}
+    action={<Button asChild><Link href="/business/new">Создать задачу</Link></Button>}>
+    {tasks.length ? <div className="grid gap-4 md:grid-cols-2">{tasks.map((task) => <div key={task.id} className="space-y-2"><p className="text-xs text-muted-foreground">{task.status === "published" ? "Опубликована" : "Черновик · не опубликован"}</p><TaskCard task={task} href={`/business/tasks/${task.id}`} /></div>)}</div> : <p className="rounded-lg border p-6">У этого бизнеса пока нет задач.</p>}
+  </PagePlaceholder>;
 }

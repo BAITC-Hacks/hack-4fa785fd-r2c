@@ -2,7 +2,12 @@ import type { z } from "zod";
 import { ApiErrorResponseSchema } from "./types";
 
 export async function requestJson<T>(url: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, { cache: "no-store", ...init });
+  let response: Response;
+  try { response = await fetch(url, { cache: "no-store", ...init }); }
+  catch (cause) {
+    if (init?.signal?.aborted) throw cause;
+    throw new Error("Нет связи с сервером. Проверьте подключение и повторите действие.");
+  }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const error = ApiErrorResponseSchema.safeParse(payload);

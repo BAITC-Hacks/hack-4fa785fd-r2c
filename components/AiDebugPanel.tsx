@@ -16,7 +16,7 @@ export function AiDebugPanel({ debug, history = [] }: { debug?: AiDebug; history
       {latest ? (
         <div className="mt-4 space-y-4">
           <p className="text-sm">Последний провайдер: <strong>{providerLabels[latest.provider]}</strong></p>
-          <p className="text-xs leading-5 text-muted-foreground">Сохранено попыток: {entries.length}. Журнал включает ошибки и переключения провайдеров. Обновляется при перезагрузке страницы.</p>
+          <p className="text-xs leading-5 text-muted-foreground">Показано ответов: {entries.length}. Здесь отображаются переданные компоненту результаты анализа и сборки карточки. Полная история попыток провайдеров сохраняется на сервере.</p>
           <div className="max-h-[36rem] space-y-3 overflow-auto">
             {entries.map((entry) => (
               <details key={entry.id} className="rounded-md border p-3">
