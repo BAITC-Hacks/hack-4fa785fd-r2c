@@ -61,7 +61,7 @@ export function BusinessTaskWizard({ initialBusinessName = "Кофейня «Д�
     <p className="text-sm text-muted-foreground">Черновик → уточняющие вопросы → карточка → рейтинг и публикация</p>
     {error && <p role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">{error}</p>}
     {pending && <p role="status">{pending} Ответ ИИ может занять около минуты.</p>}
-    {task ? <TaskEditor key={task.id} initialTask={task} /> : <Card><CardHeader><CardTitle>{analysis ? "Уточните задачу" : "Опишите задачу своими словами"}</CardTitle></CardHeader><CardContent>
+    {task ? <TaskEditor key={task.id} initialTask={task} redirectAfterPublish /> : <Card><CardHeader><CardTitle>{analysis ? "Уточните задачу" : "Опишите задачу своими словами"}</CardTitle></CardHeader><CardContent>
       <fieldset disabled={Boolean(pending)} className="space-y-5">
         {!analysis ? <>
           <div className="space-y-2"><Label htmlFor="business-name">Название бизнеса</Label><Input id="business-name" value={businessName} onChange={(event) => setBusinessName(event.target.value)} /></div>

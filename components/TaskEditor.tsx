@@ -1,11 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { z } from "zod";
-import { requestJson } from "@/lib/client-api";
-import { calculateScore } from "@/lib/scoring";
-import { TaskSchema, fieldKeys, type Card as TaskCard, type FieldKey, type Task } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import { saveTaskCard, publishTask } from "@/lib/task-client";
+import { fieldKeys, type Card as TaskCard, type FieldKey, type Task } from "@/lib/types";
 import { ScoreMeter } from "./ScoreMeter";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { Button } from "./ui/button";
@@ -18,9 +16,8 @@ const labels: Record<FieldKey, string> = {
   data: "Данные и материалы", constraints: "Ограничения", expectedResult: "Ожидаемый результат",
   successCriteria: "Критерии успеха", contact: "Контакт", interactionFormat: "Формат взаимодействия",
 };
-const PublishedSchema = TaskSchema.extend({ position: z.number().int().positive(), total: z.number().int().positive() });
 
-export function TaskEditor({ initialTask }: { initialTask: Task }) {
+export function TaskEditor({ initialTask, redirectAfterPublish = false }: { initialTask: Task; redirectAfterPublish?: boolean }) {
   const router = useRouter();
   const [card, setCard] = useState(initialTask.card);
   const latest = useRef(card);
@@ -34,8 +31,7 @@ export function TaskEditor({ initialTask }: { initialTask: Task }) {
   const [published, setPublished] = useState(initialTask.status === "published");
   const [position, setPosition] = useState<{ position: number; total: number } | null>(null);
   const [ratingStage, setRatingStage] = useState(false);
-  const score = useMemo(() => calculateScore(card), [card]);
-  const url = `/api/tasks/${encodeURIComponent(initialTask.id)}`;
+  const [score, setScore] = useState(initialTask.score);
   useEffect(() => {
     if (!dirty && !saving) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
@@ -50,8 +46,8 @@ export function TaskEditor({ initialTask }: { initialTask: Task }) {
     // Full card snapshots must reach the server in edit order.
     queue.current = queue.current.then(async () => {
       try {
-        await requestJson(url, TaskSchema, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ card: next }) });
-        if (revision === version.current) { setDirty(false); setError(""); }
+        const saved = await saveTaskCard(initialTask.id, next);
+        if (revision === version.current) { setScore(saved.score); setDirty(false); setError(""); }
       } catch (cause) {
         if (revision === version.current) setError(cause instanceof Error ? cause.message : "Не удалось сохранить карточку.");
       } finally { if (revision === version.current) setSaving(false); }
@@ -64,9 +60,11 @@ export function TaskEditor({ initialTask }: { initialTask: Task }) {
     publishLock.current = true; setPublishing(true); setError("");
     try {
       await queue.current;
-      const result = await requestJson(`${url}/publish`, PublishedSchema, { method: "POST" });
+      const { task: result, href } = await publishTask(initialTask.id);
+      setScore(result.score);
       setPublished(true); setPosition({ position: result.position, total: result.total });
-      router.refresh();
+      if (redirectAfterPublish) router.push(href);
+      else router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось опубликовать задачу."); }
     finally { publishLock.current = false; setPublishing(false); }
   }
@@ -83,11 +81,11 @@ export function TaskEditor({ initialTask }: { initialTask: Task }) {
         </div>)}</fieldset>}
         <Button variant="outline" disabled={publishing} onClick={() => setRatingStage(!ratingStage)}>{ratingStage ? "Вернуться к карточке" : "Посмотреть рейтинг"}</Button>
         <p className="text-sm text-muted-foreground">Для публикации укажите название и подтвердите все заполненные поля. Пустые поля и низкий рейтинг не препятствуют публикации.</p>
-        <Button disabled={!canPublish || publishing} onClick={() => void publish()}>{publishing ? "Публикуем…" : published ? "Обновить позицию в каталоге" : "Опубликовать"}</Button>
+        {ratingStage && <Button disabled={!canPublish || publishing} onClick={() => void publish()}>{publishing ? "Публикуем…" : published ? "Обновить позицию в каталоге" : "Опубликовать"}</Button>}
         {position && <p role="status" className="font-medium text-primary">Ваша задача на {position.position} месте из {position.total}</p>}
         {!saving && !dirty && <div className="flex gap-4 text-sm"><Link className="text-primary underline" href={`/business/tasks/${initialTask.id}`}>Карточка и отклики</Link>{published && <Link className="text-primary underline" href={`/catalog/${initialTask.id}`}>Открыть в каталоге</Link>}</div>}
       </CardContent></Card>
-      <Card className="lg:sticky lg:top-6"><CardContent className="space-y-6"><ScoreMeter score={score} /><ScoreBreakdown score={score} /></CardContent></Card>
+      <Card className="lg:sticky lg:top-6"><CardContent className="space-y-6">{(saving || dirty) && <p role="status" className="text-sm text-muted-foreground">Показан последний сохранённый рейтинг. Новый результат появится после ответа сервера.</p>}<ScoreMeter score={score} /><ScoreBreakdown score={score} /></CardContent></Card>
     </div>
   </div>;
 }
