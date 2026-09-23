@@ -7,7 +7,8 @@ import { requestJson } from "@/lib/client-api";
 import { z } from "zod";
 import { TaskSchema } from "@/lib/types";
 import { fieldKeys, type Card as TaskCard, type FieldKey, type Task } from "@/lib/types";
-import { Check } from "lucide-react";
+import { ArrowRight, Check, Target } from "lucide-react";
+import { getNextStep, observedPosition } from "@/lib/task-progress";
 import { calculateScore } from "@/lib/scoring";
 import { getLevel } from "@/lib/levels";
 import { confirmNonemptyFields, editCardField, levelUpgradeMessage } from "@/lib/card-confirmation";
@@ -47,16 +48,32 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
   const [scoreHistory, setScoreHistory] = useState(initialTask.scoreHistory);
   const [savedTask, setSavedTask] = useState(initialTask);
   const [catalog, setCatalog] = useState<Task[]>();
+  const catalogSnapshot = useRef<Task[] | undefined>(undefined);
+  const displayedTask = useRef(initialTask);
+  const [saveResult, setSaveResult] = useState<{ delta: number; label: string; before: number | null; after: number | null } | null>(null);
+  const [focusedField, setFocusedField] = useState<FieldKey | null>(null);
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => { clearTimeout(focusTimer.current); }, []);
   useEffect(() => {
     const controller = new AbortController();
     void requestJson("/api/tasks", CatalogSchema, { signal: controller.signal })
-      .then((result) => { if (!controller.signal.aborted) setCatalog(result.tasks); })
+      .then((result) => { if (!controller.signal.aborted && version.current === 0) { setCatalog(result.tasks); catalogSnapshot.current = result.tasks; } })
       .catch(() => { /* Ranking hints are optional; editing remains available. */ });
     return () => controller.abort();
   }, [initialTask.id]);
   const savedScore = useRef(initialTask.score);
   // A disposable preview only: these flags are never saved without a human action.
   const preview = useMemo(() => calculateScore(confirmNonemptyFields(card)), [card]);
+  const nextStep = getNextStep(preview, score.total);
+  function focusField(field: FieldKey) {
+    const input = document.getElementById(`task-${field}`);
+    if (!input) return;
+    clearTimeout(focusTimer.current);
+    setFocusedField(field);
+    input.focus({ preventScroll: true });
+    input.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+    focusTimer.current = setTimeout(() => setFocusedField(null), 2200);
+  }
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 4000);
@@ -78,6 +95,25 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
       try {
         const saved = await saveTaskCard(initialTask.id, next);
         if (revision === version.current) {
+          const previous = displayedTask.current;
+          const delta = saved.score.total - previous.score.total;
+          const changedBlocks = saved.score.blocks.filter((block) => block.earned !== previous.score.blocks.find((entry) => entry.key === block.key)?.earned);
+          const result = {
+            delta,
+            label: changedBlocks.length === 1 ? changedBlocks[0].label : "Рейтинг карточки",
+            before: observedPosition(previous, catalogSnapshot.current),
+            after: null as number | null,
+          };
+          setSaveResult(result);
+          displayedTask.current = saved;
+          // Optional catalog refresh must not delay autosave or turn a saved edit into an error.
+          void requestJson("/api/tasks", CatalogSchema, { signal: AbortSignal.timeout(5000) })
+            .then((fresh) => {
+              if (revision !== version.current) return;
+              setCatalog(fresh.tasks); catalogSnapshot.current = fresh.tasks;
+              setSaveResult({ ...result, after: observedPosition(saved, fresh.tasks) });
+            })
+            .catch(() => { if (revision === version.current) { setCatalog(undefined); catalogSnapshot.current = undefined; } });
           const upgrade = levelUpgradeMessage(savedScore.current.level, saved.score.level);
           if (upgrade) setNotice(upgrade);
           savedScore.current = saved.score;
@@ -108,6 +144,9 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
       const { task: result, href } = await publishTask(initialTask.id);
       setScore(result.score);
       setSavedTask(result);
+      displayedTask.current = result;
+      savedScore.current = result.score;
+      setSaveResult(null);
       setPublished(true); setPosition({ position: result.position, total: result.total });
       if (redirectAfterPublish) router.push(href);
       else router.refresh();
@@ -117,7 +156,13 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
   return <div className="space-y-5">
     <section className="grid items-center gap-5 rounded-xl border bg-card p-6 lg:grid-cols-[1.5fr_1fr]" aria-label="Рейтинг карточки">
       <div className="space-y-3"><h2 className="text-3xl font-semibold tracking-tight">Предварительный рейтинг: {preview.potential} / 100</h2><LevelBadge level={getLevel(preview.potential)} /><p className="text-sm text-muted-foreground">Оценка полноты карточки. Баллы начисляются только за подтверждённые вами поля.</p></div>
-      <div className="rounded-lg bg-secondary/40 p-4"><ScoreMeter score={score} /><p className="mt-2 text-xs text-muted-foreground">Показан последний сохранённый балл.</p></div>
+      <div className="rounded-lg bg-secondary/40 p-4"><ScoreMeter score={score} /><p className="mt-2 text-xs text-muted-foreground">Показан последний сохранённый балл.</p>
+        <div role="status" aria-live="polite" className="mt-3 h-24 overflow-y-auto rounded-xl border border-emerald-200/70 bg-white/70 p-3 text-sm">
+          <p className="text-xs text-muted-foreground">Последнее сохранение</p>
+          {saveResult ? <><p className={`mt-1 font-semibold ${saveResult.delta > 0 ? "text-emerald-800" : "text-foreground"}`}>{saveResult.delta === 0 ? "Баллы не изменились" : `${saveResult.delta > 0 ? "+" : ""}${saveResult.delta} баллов · ${saveResult.label}`}</p>
+            {saveResult.before !== null && saveResult.after !== null && saveResult.before !== saveResult.after && <p className="mt-1 text-xs">Позиция в каталоге: {saveResult.before} → {saveResult.after}</p>}</> : <p className="mt-1 text-xs text-muted-foreground">Здесь появится результат вашей правки.</p>}
+        </div>
+      </div>
     </section>
     {notice && <LevelCelebration key={notice} message={notice} detail={score.level === "priority" ? (published ? "Она выделена в каталоге." : "После публикации она будет выделена в каталоге.") : undefined} />}
     {showScoreHistory && <ScoreHistory history={scoreHistory} />}
@@ -125,7 +170,7 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
     {error && <div role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">{error}{dirty && <Button className="ml-3" variant="outline" disabled={saving} onClick={() => save(latest.current)}>Повторить сохранение</Button>}</div>}
     <div className="grid items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
       <Card><CardHeader><CardTitle>Проверьте карточку</CardTitle></CardHeader><CardContent className="space-y-5">
-        <fieldset disabled={publishing} className="space-y-5">{fieldKeys.map((key) => <div key={key} className="space-y-2 rounded-lg border p-4">
+        <fieldset disabled={publishing} className="space-y-5">{fieldKeys.map((key) => <div key={key} className={`space-y-2 rounded-lg border p-4 transition-[background-color,box-shadow] duration-300 motion-reduce:transition-none ${focusedField === key ? "bg-emerald-50 ring-2 ring-emerald-400 ring-offset-2" : ""}`}>
           <div className="flex items-center justify-between gap-3"><Label htmlFor={`task-${key}`}>{labels[key]}</Label>{card[key].confirmed && card[key].value.trim() && <span className="flex items-center gap-1 text-xs text-emerald-700"><Check className="size-3.5" aria-hidden="true" />подтверждено</span>}</div>
           <Textarea id={`task-${key}`} rows={key === "title" ? 2 : 3} value={card[key].value} onChange={(event) => { void save(editCardField(latest.current, key, event.target.value)); }} />
           {card[key].evidence && <blockquote className="text-xs text-muted-foreground">Источник: «{card[key].evidence}»</blockquote>}
@@ -141,6 +186,12 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
         <div className={`flex gap-4 text-sm ${saving || dirty ? "invisible" : ""}`} aria-hidden={saving || dirty}><Link className="text-primary underline" href={`/business/tasks/${initialTask.id}`}>Карточка и отклики</Link>{published && <Link className="text-primary underline" href={`/catalog/${initialTask.id}`}>Открыть в каталоге</Link>}</div>
       </CardContent></Card>
       <Card className="lg:sticky lg:top-6"><CardHeader><CardTitle>Что добавить</CardTitle></CardHeader><CardContent className="space-y-6">
+        {nextStep && <section aria-label="Следующий полезный шаг" className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-lime-50 to-emerald-50 p-4">
+          <div className="flex items-start gap-2"><Target className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden="true" /><h3 className="font-semibold text-emerald-950">{nextStep.levelName ? `До «${nextStep.levelName}» — один шаг` : "Следующий полезный шаг"}</h3></div>
+          <p className="mt-3 text-sm font-medium">{labels[nextStep.field]} · до +{nextStep.points} баллов</p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">{nextStep.hints.join(" ")}</p>
+          <Button className="mt-3 w-full" disabled={publishing} onClick={() => focusField(nextStep.field)}>Дополнить поле <ArrowRight className="size-4" aria-hidden="true" /></Button>
+        </section>}
         {preview.missing.length ? <ul className="space-y-3 text-sm">{preview.missing.map((item) => <li key={item.label}><p className="font-medium">{item.label} · +{item.points}</p><p className="mt-1 text-muted-foreground">{item.hint.replace(" и подтвердите поле", "")}</p></li>)}</ul> : <p className="text-sm text-emerald-700">Все критерии полноты выполнены.</p>}
         <details><summary className="cursor-pointer text-sm font-medium">Расшифровка рейтинга и прогноз места в каталоге</summary><div className="mt-3"><ScoreBreakdown score={score} task={savedTask} catalog={catalog} /></div></details>
       </CardContent></Card>
