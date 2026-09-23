@@ -1,0 +1,22 @@
+# Dependencies and generated files
+node_modules/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets: the only committed environment file is the empty template.
+.env*
+!.env.example
+*.pem
+
+# Local mutable database, atomic-write files, and logs
+data/db.json
+data/db.json.*
+data/*.tmp
+*.log
+.npm/
+.DS_Store
+.vercel/

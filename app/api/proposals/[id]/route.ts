@@ -1,0 +1,7 @@
+import { apiError, notImplemented, validatedId, withJson, type IdRouteContext } from "@/lib/api";
+import { ProposalActionInputSchema } from "@/lib/types";
+
+export async function PATCH(request: Request, context: IdRouteContext) {
+  if (!(await validatedId(context)).success) return apiError("Некорректный идентификатор отклика.");
+  return withJson(request, ProposalActionInputSchema, () => notImplemented());
+}
