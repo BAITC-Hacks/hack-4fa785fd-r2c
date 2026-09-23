@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { Navigation } from "@/components/Navigation";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
-import { Badge } from "@/components/ui/badge";
+import { ArrowUpRight } from "lucide-react";
 import { readDb } from "@/lib/store";
 import { RoleSchema, type Role } from "@/lib/types";
 import "./globals.css";
@@ -30,15 +30,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     <html lang="ru"><body>
-      <header className="border-b bg-card">
-        <div className="page-shell flex h-20 items-center justify-between gap-5">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="TaskReady — главная"><span className="flex size-8 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">T</span><span className="text-xl font-semibold tracking-tight">TaskReady<span className="text-primary">.</span></span></Link>
+      <header className="site-header page-shell">
+        <div className="header-meta"><span>Бизнес × студенческие команды</span><span>HackAlem AI · AI Sana</span></div>
+        <div className="header-bar">
+          <Link href="/" className="brand" aria-label="TaskReady — главная"><span className="brand-symbol"><ArrowUpRight className="size-7" /></span><span>TaskReady<span className="text-primary">.</span></span></Link>
           <Navigation /><RoleSwitcher key={JSON.stringify(role)} initialRole={role} teams={db.teams} />
         </div>
       </header>
-      <div className="border-b bg-secondary/50"><div className="page-shell flex h-11 items-center justify-between text-xs text-muted-foreground"><span>HackAlem AI · AI Sana</span><Badge variant="outline" className="border-primary/20 bg-card/50 text-primary">От задачи к результату</Badge><span>Бизнес × студенческие команды</span></div></div>
-      <main className="page-shell min-h-[calc(100vh-207px)] py-10">{children}</main>
-      <footer className="page-shell flex h-20 items-center justify-between border-t text-xs text-muted-foreground"><span>TaskReady · подготовка задач к совместной работе</span><span>Этап 01 / структура и интерфейсы</span></footer>
+      <main className="page-shell min-h-[calc(100vh-220px)] py-10">{children}</main>
+      <footer className="page-shell"><div className="site-footer"><Link href="/" className="text-lg font-semibold tracking-tight">TaskReady<span className="text-primary">.</span></Link><span>Понятные задачи. Совместные результаты.</span><Link href="/catalog">К новым возможностям ↗</Link></div></footer>
     </body></html>
   );
 }

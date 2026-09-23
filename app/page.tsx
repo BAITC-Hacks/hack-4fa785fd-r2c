@@ -1,34 +1,59 @@
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
+import { ArrowUpRight, ArrowRight, Check, Sparkles, Layers3, Users, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const modules = [
-  { title: "Постановка задачи", description: "Черновик, уточняющие вопросы и карточка для подтверждения.", href: "/business/new", label: "Открыть мастер" },
-  { title: "Кабинет бизнеса", description: "Мои задачи, рейтинг готовности и ручной выбор команд.", href: "/business/tasks", label: "Открыть мои задачи" },
-  { title: "Открытый каталог", description: "Опубликованные задачи всех уровней и отклики команд.", href: "/catalog", label: "Открыть каталог" },
-  { title: "Прогресс команд", description: "Баллы за этапы работы, подтверждённые бизнесом.", href: "/teams", label: "Посмотреть команды" },
+const steps = [
+  { number: "01", icon: Sparkles, title: "Расскажите об идее", text: "ИИ задаст нужные вопросы и поможет собрать понятную карточку задачи." },
+  { number: "02", icon: Layers3, title: "Добавьте ясности", text: "Подтвердите сведения и узнайте, что ещё нужно для старта. Каждое улучшение видно в рейтинге." },
+  { number: "03", icon: Users, title: "Найдите свою команду", text: "Опубликуйте задачу, сравните предложения и выберите, с кем двигаться дальше." },
 ];
 
 export default function HomePage() {
-  return (
-    <div className="space-y-10">
-      <section className="grid grid-cols-[1.5fr_1fr] gap-12 rounded-2xl border bg-card p-9">
-        <div className="space-y-5"><p className="eyebrow">От идеи к понятной задаче</p><h1 className="max-w-2xl text-5xl leading-[1.1] font-semibold tracking-tight">Хорошее решение<br />начинается с ясности.</h1><p className="max-w-lg text-base leading-7 text-muted-foreground">TaskReady поможет бизнесу подготовить задачу, увидеть её готовность и выбрать студенческую команду.</p>
-          <div className="flex gap-3 pt-1"><Button asChild><Link href="/business/new">Создание задачи <span aria-hidden="true">→</span></Link></Button><Button asChild variant="outline"><Link href="/catalog">Каталог задач</Link></Button></div>
+  return <div className="home-page">
+    <section className="home-hero" aria-labelledby="hero-title">
+      <div className="hero-copy">
+        <span className="hero-kicker"><span className="size-2 rounded-full bg-primary" /> Бизнес встречает новые таланты</span>
+        <h1 id="hero-title">Большие решения.<br /><span>С понятной задачи.</span></h1>
+        <p className="hero-description">Превратите идею в проект, к которому хочется присоединиться. С поддержкой ИИ и студенческих команд.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button asChild className="hero-primary h-[54px] rounded-[17px] px-6 text-[15px]"><Link href="/business/new">Создать задачу <ArrowUpRight /></Link></Button>
+          <Button asChild variant="outline" className="hero-secondary h-[54px] rounded-[17px] px-6 text-[15px]"><Link href="/catalog">Найти проект <ArrowRight /></Link></Button>
         </div>
-        <div className="flex flex-col justify-between rounded-xl bg-secondary/60 p-6"><div><Badge variant="outline" className="bg-card">Прозрачный выбор</Badge><h2 className="mt-4 text-xl font-semibold">От задачи к результату</h2><p className="mt-3 text-sm leading-6 text-muted-foreground">Рейтинг показывает готовность задачи. Команды предлагают решения, бизнес выбирает исполнителей и подтверждает их прогресс.</p></div>
-          <div className="mt-6 grid grid-cols-3 gap-3 border-t border-primary/15 pt-5">{[["100", "баллов готовности"], ["07", "блоков рейтинга"], ["+50", "баллов за этап"]].map(([value, label]) => <div key={label}><p className="text-3xl font-semibold tabular-nums">{value}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{label}</p></div>)}</div>
+        <div className="hero-note"><span className="flex -space-x-2" aria-hidden="true"><span>Б</span><span>К</span><span>И</span></span><p>Ваш опыт + свежий взгляд<br /><strong>Вместе — больше возможностей</strong></p></div>
+      </div>
+
+      <div className="hero-visual" aria-label="Пример: от черновика к готовой задаче с рейтингом 92 из 100">
+        <div className="visual-orbit orbit-one" /><div className="visual-orbit orbit-two" />
+        <div className="idea-tile"><span className="text-xs font-medium text-muted-foreground">Всё начинается с идеи</span><p>«Хочется, чтобы<br />клиенты возвращались»</p><span className="idea-tag">Черновик <ArrowRight className="size-3" /></span></div>
+        <div className="ready-tile">
+          <div className="flex items-center justify-between"><span className="tile-label">ГОТОВНОСТЬ К СТАРТУ</span><span className="tile-symbol"><ArrowUpRight className="size-5" /></span></div>
+          <div className="demo-score">92<span>/100</span></div>
+          <div className="demo-track"><span /></div>
+          <h2>Изучить, что возвращает<br />гостей в кофейню</h2>
+          <div className="space-y-2.5">{["Понятная цель", "Данные для работы", "Измеримый результат"].map((text) => <p className="flex items-center gap-2 text-sm" key={text}><Check className="size-4" />{text}</p>)}</div>
+          <div className="tile-bottom"><span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-current" /> Приоритетная</span><span>Пример карточки</span></div>
         </div>
-      </section>
+        <div className="ai-tile"><span className="ai-symbol"><Sparkles className="size-5" /></span><div><strong>ИИ помогает уточнить</strong><p>Решение остаётся за вами</p></div></div>
+        <span className="visual-caption">Меньше неопределённости. Больше движения.</span>
+      </div>
+    </section>
 
-      <section aria-labelledby="modules-heading" className="space-y-5"><div className="flex items-center justify-between"><h2 id="modules-heading" className="text-xl font-semibold">Разделы платформы</h2><span className="text-sm text-muted-foreground">Выберите роль в шапке и откройте нужный раздел</span></div>
-        <div className="grid grid-cols-4 gap-4">{modules.map((module, index) => <Card key={module.href} className="gap-4 shadow-none"><CardHeader><span className="mb-3 text-xs font-medium text-primary">0{index + 1}</span><CardTitle className="text-base">{module.title}</CardTitle></CardHeader><CardContent className="flex flex-1 flex-col justify-between gap-5"><p className="text-sm leading-6 text-muted-foreground">{module.description}</p><Link className="text-sm font-medium text-primary hover:underline" href={module.href}>{module.label} <span aria-hidden="true">→</span></Link></CardContent></Card>)}</div>
-      </section>
+    <section className="home-facts" aria-label="Принципы платформы">
+      <div><strong>100<span> баллов</span></strong><p>Прозрачная оценка готовности</p></div>
+      <div><strong>7<span> блоков</span></strong><p>От контекста до критериев успеха</p></div>
+      <div><strong>+50<span> за этап</span></strong><p>Команде за подтверждённый прогресс</p></div>
+      <div className="fact-principle"><Check className="size-5" /><p>ИИ помогает.<br /><strong>Человек решает.</strong></p></div>
+    </section>
 
-      <section className="grid grid-cols-2 gap-8 border-t pt-7"><div><p className="eyebrow">Как это работает</p><h2 className="mt-2 text-xl font-semibold">От идеи до прогресса команды</h2><p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground">Черновик → вопросы → подтверждение → рейтинг → публикация → отклик → выбор → прогресс команды.</p></div>
-        <ul className="space-y-3 text-sm text-muted-foreground">{["Опишите задачу и подтвердите сведения", "Сравните предложения и выберите команды", "Подтвердите выполненный этап и начислите баллы"].map((item) => <li key={item} className="flex gap-3"><span aria-hidden="true" className="mt-0.5 size-4 shrink-0 rounded border bg-card" />{item}</li>)}</ul>
-      </section>
-    </div>
-  );
+    <section className="home-steps" aria-labelledby="steps-title">
+      <div className="section-heading"><div><p className="eyebrow">Путь к результату</p><h2 id="steps-title">Хорошему старту<br />нужна ясность.</h2></div><p>От первого «а что, если…»<br />до совместной работы над решением.</p></div>
+      <div className="grid grid-cols-3 gap-5">{steps.map(({ number, icon: Icon, title, text }) => <article className="step-tile" key={number}><div className="flex items-center justify-between"><span className="step-icon"><Icon className="size-6" /></span><span className="step-number">{number}</span></div><h3>{title}</h3><p>{text}</p></article>)}</div>
+    </section>
+
+    <section className="audience-grid" aria-label="Выберите свой путь">
+      <Link href="/business/tasks" className="audience-tile business-tile"><div className="flex justify-between"><span className="eyebrow">Для бизнеса</span><ArrowUpRight /></div><h2>Свежий взгляд<br />на ваши задачи.</h2><p>Соберите понятный запрос и найдите команду, которая предложит свой подход.</p><span className="audience-link">Перейти в кабинет <ArrowRight className="size-4" /></span></Link>
+      <Link href="/catalog" className="audience-tile team-tile"><div className="flex justify-between"><span className="eyebrow">Для команд</span><ArrowUpRight /></div><h2>Настоящие проекты.<br />Ваш следующий шаг.</h2><p>Применяйте знания на практике, предлагайте решения и зарабатывайте баллы за результат.</p><span className="audience-link">Выбрать проект <ArrowRight className="size-4" /></span></Link>
+    </section>
+    <div className="home-closing"><TrendingUp className="size-5 text-primary" /><p>Каждый подтверждённый шаг — движение вперёд.</p><Link href="/teams">Рейтинг команд <ArrowUpRight className="size-4" /></Link></div>
+  </div>;
 }

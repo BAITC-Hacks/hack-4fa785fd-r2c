@@ -13,12 +13,12 @@ const links = [
 export function Navigation() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Основная навигация" className="flex items-center gap-1">
+    <nav aria-label="Основная навигация" className="main-navigation">
       {links.map(({ href, label }) => {
-        const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+        const active = href === "/" ? pathname === "/" : href === "/business/tasks" ? pathname.startsWith("/business") : pathname.startsWith(href);
         return (
           <Link key={href} href={href} aria-current={active ? "page" : undefined}
-            className={`rounded-md px-3 py-2 text-sm transition-colors hover:bg-secondary ${active ? "bg-secondary font-medium text-primary" : "text-muted-foreground"}`}>
+            className={`nav-link ${active ? "nav-link-active" : ""}`}>
             {label}
           </Link>
         );
