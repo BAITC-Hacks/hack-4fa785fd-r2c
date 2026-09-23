@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, ArrowRight, Check, Sparkles, Layers3, Users, TrendingUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { RoleEntryLink } from "@/components/RoleEntryLink";
+import { readDb } from "@/lib/store";
 
 const steps = [
   { number: "01", icon: Sparkles, title: "Расскажите об идее", text: "ИИ задаст нужные вопросы и поможет собрать понятную карточку задачи." },
@@ -8,16 +9,30 @@ const steps = [
   { number: "03", icon: Users, title: "Найдите свою команду", text: "Опубликуйте задачу, сравните предложения и выберите, с кем двигаться дальше." },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { teams } = await readDb();
+  const teamIds = teams.map(({ id }) => ({ id }));
   return <div className="home-page">
     <section className="home-hero" aria-labelledby="hero-title">
       <div className="hero-copy">
         <span className="hero-kicker"><span className="size-2 rounded-full bg-primary" /> Бизнес встречает новые таланты</span>
         <h1 id="hero-title">Большие решения.<br /><span>С понятной задачи.</span></h1>
         <p className="hero-description">Превратите идею в проект, к которому хочется присоединиться. С поддержкой ИИ и студенческих команд.</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button asChild className="hero-primary h-[54px] rounded-[17px] px-6 text-[15px]"><Link href="/business/new">Создать задачу <ArrowUpRight /></Link></Button>
-          <Button asChild variant="outline" className="hero-secondary h-[54px] rounded-[17px] px-6 text-[15px]"><Link href="/catalog">Найти проект <ArrowRight /></Link></Button>
+        <div className="entry-grid">
+          <RoleEntryLink mode="business" teams={teamIds} href="/business/new" className="entry-card entry-business">
+            <span className="entry-audience">ДЛЯ БИЗНЕСА</span>
+            <h2>У меня есть задача</h2>
+            <p>ИИ поможет уточнить идею.<br />Команды предложат решения.</p>
+            <span className="entry-button">Создать задачу <ArrowUpRight className="size-5" /></span>
+            <span className="entry-hint">Начните с описания своими словами</span>
+          </RoleEntryLink>
+          <RoleEntryLink mode="team" teams={teamIds} href="/catalog" className="entry-card entry-team">
+            <span className="entry-audience">ДЛЯ КОМАНДЫ</span>
+            <h2>Хочу найти проект</h2>
+            <p>Выберите реальную задачу<br />и предложите свой подход.</p>
+            <span className="entry-button">Найти проект <ArrowUpRight className="size-5" /></span>
+            <span className="entry-hint">Сначала посмотрите, что интересно</span>
+          </RoleEntryLink>
         </div>
         <div className="hero-note"><span className="flex -space-x-2" aria-hidden="true"><span>Б</span><span>К</span><span>И</span></span><p>Ваш опыт + свежий взгляд<br /><strong>Вместе — больше возможностей</strong></p></div>
       </div>
@@ -51,8 +66,8 @@ export default function HomePage() {
     </section>
 
     <section className="audience-grid" aria-label="Выберите свой путь">
-      <Link href="/business/tasks" className="audience-tile business-tile"><div className="flex justify-between"><span className="eyebrow">Для бизнеса</span><ArrowUpRight /></div><h2>Свежий взгляд<br />на ваши задачи.</h2><p>Соберите понятный запрос и найдите команду, которая предложит свой подход.</p><span className="audience-link">Перейти в кабинет <ArrowRight className="size-4" /></span></Link>
-      <Link href="/catalog" className="audience-tile team-tile"><div className="flex justify-between"><span className="eyebrow">Для команд</span><ArrowUpRight /></div><h2>Настоящие проекты.<br />Ваш следующий шаг.</h2><p>Применяйте знания на практике, предлагайте решения и зарабатывайте баллы за результат.</p><span className="audience-link">Выбрать проект <ArrowRight className="size-4" /></span></Link>
+      <RoleEntryLink mode="business" teams={teamIds} href="/business/tasks" className="audience-tile business-tile"><div className="flex justify-between"><span className="eyebrow">Для бизнеса</span><ArrowUpRight /></div><h2>Свежий взгляд<br />на ваши задачи.</h2><p>Соберите понятный запрос и найдите команду, которая предложит свой подход.</p><span className="audience-link">Перейти в кабинет <ArrowRight className="size-4" /></span></RoleEntryLink>
+      <RoleEntryLink mode="team" teams={teamIds} href="/catalog" className="audience-tile team-tile"><div className="flex justify-between"><span className="eyebrow">Для команд</span><ArrowUpRight /></div><h2>Настоящие проекты.<br />Ваш следующий шаг.</h2><p>Применяйте знания на практике, предлагайте решения и зарабатывайте баллы за результат.</p><span className="audience-link">Выбрать проект <ArrowRight className="size-4" /></span></RoleEntryLink>
     </section>
     <div className="home-closing"><TrendingUp className="size-5 text-primary" /><p>Каждый подтверждённый шаг — движение вперёд.</p><Link href="/teams">Рейтинг команд <ArrowUpRight className="size-4" /></Link></div>
   </div>;

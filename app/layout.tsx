@@ -34,7 +34,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <div className="header-meta"><span>Бизнес × студенческие команды</span><span>HackAlem AI · AI Sana</span></div>
         <div className="header-bar">
           <Link href="/" className="brand" aria-label="TaskReady — главная"><span className="brand-symbol"><ArrowUpRight className="size-7" /></span><span>TaskReady<span className="text-primary">.</span></span></Link>
-          <Navigation /><RoleSwitcher key={JSON.stringify(role)} initialRole={role} teams={db.teams} />
+          <Navigation mode={role.kind} /><RoleSwitcher key={JSON.stringify(role)} initialRole={role} teams={db.teams} businesses={[...new Set(db.tasks.map((task) => task.businessName))]} />
         </div>
       </header>
       <main className="page-shell min-h-[calc(100vh-220px)] py-10">{children}</main>

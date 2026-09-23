@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { requestJson } from "@/lib/client-api";
+import { rememberRole } from "@/lib/role-client";
 import { AnalyzeDraftResponseSchema, BuildCardResponseSchema, CardSchema, TaskSchema, fieldKeys, type AiDebug, type AnalyzeDraftResponse, type BuildCardResult, type Task } from "@/lib/types";
 import { AiDebugPanel } from "./AiDebugPanel";
 import { TaskEditor } from "./TaskEditor";
@@ -53,7 +54,7 @@ export function BusinessTaskWizard({ initialBusinessName = "Кофейня «Д�
       }])));
       const saved = await requestJson("/api/tasks", TaskSchema, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessName, industry, draftText, card }) });
       setTask(saved);
-      document.cookie = `taskready-role=${encodeURIComponent(JSON.stringify({ kind: "business", businessName: saved.businessName }))}; Path=/; Max-Age=31536000; SameSite=Lax${window.location.protocol === "https:" ? "; Secure" : ""}`;
+      rememberRole({ kind: "business", businessName: saved.businessName });
       router.refresh();
     });
   }

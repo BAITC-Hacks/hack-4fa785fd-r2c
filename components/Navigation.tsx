@@ -10,16 +10,16 @@ const links = [
   { href: "/teams", label: "Команды" },
 ];
 
-export function Navigation() {
+export function Navigation({ mode = "business" }: { mode?: "business" | "team" }) {
   const pathname = usePathname();
   return (
     <nav aria-label="Основная навигация" className="main-navigation">
-      {links.map(({ href, label }) => {
+      {links.filter((link) => mode === "business" || link.href !== "/business/tasks").map(({ href, label }) => {
         const active = href === "/" ? pathname === "/" : href === "/business/tasks" ? pathname.startsWith("/business") : pathname.startsWith(href);
         return (
           <Link key={href} href={href} aria-current={active ? "page" : undefined}
             className={`nav-link ${active ? "nav-link-active" : ""}`}>
-            {label}
+            {href === "/catalog" ? "Найти проект" : label}
           </Link>
         );
       })}
