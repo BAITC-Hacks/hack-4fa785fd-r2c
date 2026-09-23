@@ -3,9 +3,21 @@ import { readData, writeData } from '../../shared/store';
 import type { Submission, SubmissionStatus, Task } from '../../shared/types';
 import './MarketplaceHome.css';
 
+type ReadinessFilter = 'all' | 'draft' | 'working' | 'ready' | 'priority';
+type SortOrder = 'score-desc' | 'score-asc' | 'newest';
+
+function readinessKey(score: number): Exclude<ReadinessFilter, 'all'> {
+  if (score >= 90) return 'priority';
+  if (score >= 70) return 'ready';
+  if (score >= 40) return 'working';
+  return 'draft';
+}
+
 export default function MarketplaceHome() {
   const [data, setData] = useState(() => readData());
   const [industry, setIndustry] = useState('Все направления');
+  const [readiness, setReadiness] = useState<ReadinessFilter>('all');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('score-desc');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [teamName, setTeamName] = useState('Команда Sana');
   const [idea, setIdea] = useState('');
@@ -17,7 +29,12 @@ export default function MarketplaceHome() {
   const tasks = useMemo(() => data.tasks
     .filter((task) => task.status === 'published')
     .filter((task) => industry === 'Все направления' || task.industry === industry)
-    .sort((a, b) => b.score - a.score), [data.tasks, industry]);
+    .filter((task) => readiness === 'all' || readinessKey(task.score) === readiness)
+    .sort((a, b) => {
+      if (sortOrder === 'score-asc') return a.score - b.score;
+      if (sortOrder === 'newest') return b.createdAt.localeCompare(a.createdAt);
+      return b.score - a.score;
+    }), [data.tasks, industry, readiness, sortOrder]);
   const selectedTask = data.tasks.find((task) => task.id === selectedTaskId);
   const availableIndustries = [...new Set(data.tasks.filter((task) => task.status === 'published').map((task) => task.industry))];
 
@@ -55,7 +72,11 @@ export default function MarketplaceHome() {
     <section className="marketplace">
       <header className="market-header">
         <div><span className="eyebrow">ОБЩИЙ КАТАЛОГ</span><h2>Выберите задачу, которая вам интересна</h2><p>Задачи открыты всем командам. Изучите условия и предложите свой план.</p></div>
-        <label className="market-filter"><span>Направление</span><select value={industry} onChange={(event) => setIndustry(event.target.value)}><option>Все направления</option>{availableIndustries.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <div className="market-filters">
+          <label className="market-filter"><span>Направление</span><select value={industry} onChange={(event) => setIndustry(event.target.value)}><option>Все направления</option>{availableIndustries.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <label className="market-filter"><span>Готовность</span><select value={readiness} onChange={(event) => setReadiness(event.target.value as ReadinessFilter)}><option value="all">Любой уровень</option><option value="draft">Черновик · 0–39</option><option value="working">Рабочая · 40–69</option><option value="ready">Готовая · 70–89</option><option value="priority">Приоритетная · 90–100</option></select></label>
+          <label className="market-filter"><span>Сортировка</span><select value={sortOrder} onChange={(event) => setSortOrder(event.target.value as SortOrder)}><option value="score-desc">По рейтингу: сначала выше</option><option value="score-asc">По рейтингу: сначала ниже</option><option value="newest">Сначала новые</option></select></label>
+        </div>
       </header>
 
       {notice && <div className="market-notice" role="status">✓ {notice}<button type="button" onClick={() => setNotice('')} aria-label="Закрыть">×</button></div>}
