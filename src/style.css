@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root { font-family: 'DM Sans', sans-serif; color: #202722; background: #f6f7f4; font-synthesis: none; text-rendering: optimizeLegibility; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button { font: inherit; cursor: pointer; }
+.shell { max-width: 1120px; margin: 0 auto; padding: 0 36px 32px; }
+.topbar { height: 78px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e7e9e3; }
+.brand { display: flex; align-items: center; gap: 10px; color: #17271c; font: 800 18px 'Manrope', sans-serif; text-decoration: none; letter-spacing: -0.5px; }
+.brand-mark { display: grid; place-items: center; height: 31px; width: 31px; border-radius: 10px; color: white; background: #27835d; font-size: 17px; }
+.topbar-note { color: #838b83; font-size: 13px; }
+.avatar { border: 0; background: #e2eee5; color: #286849; font-weight: 700; border-radius: 50%; width: 36px; height: 36px; }
+.hero { display: flex; justify-content: space-between; align-items: center; padding: 64px 0 44px; }
+.eyebrow { color: #28805c; letter-spacing: 1.6px; font-size: 10px; font-weight: 700; }
+h1, h2 { font-family: 'Manrope', sans-serif; letter-spacing: -1.4px; }
+h1 { font-size: clamp(37px, 5.4vw, 61px); line-height: 1.09; margin: 13px 0 14px; font-weight: 700; }
+.hero p { color: #6e786f; margin: 0; font-size: 16px; }
+.hero-orbit { margin-right: 40px; width: 156px; height: 156px; border: 1px solid #d2e2d5; border-radius: 50%; display: grid; place-items: center; position: relative; color: #31845e; font-size: 14px; }
+.hero-orbit:before, .hero-orbit:after { content: ''; position: absolute; border: 1px solid #dce9de; border-radius: 50%; inset: 14px; }
+.hero-orbit:after { inset: 30px; }
+.hero-orbit i { position: absolute; right: 9px; top: 12px; background: #f6f7f4; padding: 0 3px; font-style: normal; font-size: 20px; }
+.role-switch { display: flex; gap: 7px; padding: 5px; background: #ecefea; border-radius: 12px; width: fit-content; margin-bottom: 20px; }
+.role-switch button { border: 0; color: #788078; background: transparent; border-radius: 8px; padding: 11px 17px; font-size: 13px; font-weight: 600; }
+.role-switch button.active { color: #206341; background: white; box-shadow: 0 1px 4px #253b2d14; }
+.panel { background: white; border: 1px solid #e9ece7; border-radius: 18px; }
+.placeholder-panel { min-height: 280px; padding: 37px; }
+.placeholder-panel h2 { font-size: 27px; margin: 15px 0 10px; letter-spacing: -.8px; }
+.placeholder-panel p { color: #79827a; max-width: 570px; line-height: 1.6; }
+footer { padding-top: 23px; color: #9aa19a; font-size: 11px; }
+footer span { padding: 0 6px; }
+@media (max-width: 650px) { .shell { padding: 0 19px 25px; } .hero { padding: 46px 0 30px; } .hero-orbit { display: none; } .topbar-note { display: none; } .role-switch { width: 100%; } .role-switch button { flex: 1; padding: 10px 7px; font-size: 11px; } .placeholder-panel { padding: 25px; min-height: 240px; } }
