@@ -5,8 +5,18 @@ export function apiError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export function notImplemented() {
-  return apiError("Каркас проекта: эта операция будет реализована на следующем этапе.", 501);
+export class ApiRequestError extends Error {
+  constructor(message: string, public readonly status = 400) { super(message); }
+}
+
+/** Business-rule failures abort updateDb; unexpected storage errors stay private. */
+export async function withApiErrors(handler: () => Promise<Response>): Promise<Response> {
+  try { return await handler(); }
+  catch (error) {
+    return error instanceof ApiRequestError
+      ? apiError(error.message, error.status)
+      : apiError("Не удалось сохранить изменения. Попробуйте ещё раз.", 500);
+  }
 }
 
 export async function withJson<T>(
