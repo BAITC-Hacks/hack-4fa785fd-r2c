@@ -3,6 +3,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { saveTaskCard, publishTask } from "@/lib/task-client";
+import { requestJson } from "@/lib/client-api";
+import { z } from "zod";
+import { TaskSchema } from "@/lib/types";
 import { fieldKeys, type Card as TaskCard, type FieldKey, type Task } from "@/lib/types";
 import { Check } from "lucide-react";
 import { calculateScore } from "@/lib/scoring";
@@ -11,6 +14,7 @@ import { confirmNonemptyFields, editCardField, levelUpgradeMessage } from "@/lib
 import { LevelBadge } from "./LevelBadge";
 import { ScoreMeter } from "./ScoreMeter";
 import { ScoreHistory } from "./ScoreHistory";
+import { LevelCelebration } from "./LevelCelebration";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -22,6 +26,7 @@ const labels: Record<FieldKey, string> = {
   data: "Данные и материалы", constraints: "Ограничения", expectedResult: "Ожидаемый результат",
   successCriteria: "Критерии успеха", contact: "Контакт", interactionFormat: "Формат взаимодействия",
 };
+const CatalogSchema = z.object({ tasks: z.array(TaskSchema) });
 
 export function TaskEditor({ initialTask, redirectAfterPublish = false, showScoreHistory = false }: { initialTask: Task; redirectAfterPublish?: boolean; showScoreHistory?: boolean }) {
   const router = useRouter();
@@ -40,6 +45,15 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
   const confirmLock = useRef(false);
   const [score, setScore] = useState(initialTask.score);
   const [scoreHistory, setScoreHistory] = useState(initialTask.scoreHistory);
+  const [savedTask, setSavedTask] = useState(initialTask);
+  const [catalog, setCatalog] = useState<Task[]>();
+  useEffect(() => {
+    const controller = new AbortController();
+    void requestJson("/api/tasks", CatalogSchema, { signal: controller.signal })
+      .then((result) => { if (!controller.signal.aborted) setCatalog(result.tasks); })
+      .catch(() => { /* Ranking hints are optional; editing remains available. */ });
+    return () => controller.abort();
+  }, [initialTask.id]);
   const savedScore = useRef(initialTask.score);
   // A disposable preview only: these flags are never saved without a human action.
   const preview = useMemo(() => calculateScore(confirmNonemptyFields(card)), [card]);
@@ -70,6 +84,7 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
           latest.current = saved.card; setCard(saved.card);
           setScore(saved.score); setDirty(false); setError("");
           setScoreHistory(saved.scoreHistory);
+          setSavedTask(saved);
         }
       } catch (cause) {
         if (revision === version.current) setError(cause instanceof Error ? cause.message : "Не удалось сохранить карточку.");
@@ -92,6 +107,7 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
       await queue.current;
       const { task: result, href } = await publishTask(initialTask.id);
       setScore(result.score);
+      setSavedTask(result);
       setPublished(true); setPosition({ position: result.position, total: result.total });
       if (redirectAfterPublish) router.push(href);
       else router.refresh();
@@ -103,7 +119,7 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
       <div className="space-y-3"><h2 className="text-3xl font-semibold tracking-tight">Предварительный рейтинг: {preview.potential} / 100</h2><LevelBadge level={getLevel(preview.potential)} /><p className="text-sm text-muted-foreground">Оценка полноты карточки. Баллы начисляются только за подтверждённые вами поля.</p></div>
       <div className="rounded-lg bg-secondary/40 p-4"><ScoreMeter score={score} />{(saving || dirty) && <p className="mt-2 text-xs text-muted-foreground">Показан последний сохранённый балл.</p>}</div>
     </section>
-    {notice && <div role="status" aria-live="polite" className="fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 rounded-2xl border border-emerald-300 bg-emerald-950 p-5 text-white shadow-xl"><p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Новый уровень готовности</p><p className="mt-2 text-lg font-semibold">{notice}{score.level === "priority" && (published ? " Она выделена в каталоге." : " После публикации она будет выделена в каталоге.")}</p></div>}
+    {notice && <LevelCelebration key={notice} message={notice} detail={score.level === "priority" ? (published ? "Она выделена в каталоге." : "После публикации она будет выделена в каталоге.") : undefined} />}
     {showScoreHistory && <ScoreHistory history={scoreHistory} />}
     <p role="status" className="text-sm text-muted-foreground">{saving ? "Сохраняем изменения…" : dirty ? "Есть несохранённые изменения" : "Все изменения сохранены"} · {published ? "Опубликована" : "Черновик"}</p>
     {error && <div role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">{error}{dirty && <Button className="ml-3" variant="outline" disabled={saving} onClick={() => save(latest.current)}>Повторить сохранение</Button>}</div>}
@@ -124,7 +140,7 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
       </CardContent></Card>
       <Card className="lg:sticky lg:top-6"><CardHeader><CardTitle>Что добавить</CardTitle></CardHeader><CardContent className="space-y-6">
         {preview.missing.length ? <ul className="space-y-3 text-sm">{preview.missing.map((item) => <li key={item.label}><p className="font-medium">{item.label} · +{item.points}</p><p className="mt-1 text-muted-foreground">{item.hint.replace(" и подтвердите поле", "")}</p></li>)}</ul> : <p className="text-sm text-emerald-700">Все критерии полноты выполнены.</p>}
-        <details><summary className="cursor-pointer text-sm font-medium">Расшифровка подтверждённого рейтинга</summary><div className="mt-3"><ScoreBreakdown score={score} /></div></details>
+        <details><summary className="cursor-pointer text-sm font-medium">Расшифровка рейтинга и прогноз места в каталоге</summary><div className="mt-3"><ScoreBreakdown score={score} task={savedTask} catalog={catalog} /></div></details>
       </CardContent></Card>
     </div>
   </div>;

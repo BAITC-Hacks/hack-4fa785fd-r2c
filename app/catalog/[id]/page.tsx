@@ -55,7 +55,7 @@ export default async function CatalogTaskPage({ params }: { params: Promise<{ id
         </CardContent></Card>
         <ProposalForm taskId={task.id} teams={db.teams} selectedTeamId={selectedTeamId} />
       </div>
-      <Card className={task.score.level === "priority" ? "border-primary/40 bg-primary/[0.025] lg:sticky lg:top-6" : "lg:sticky lg:top-6"}><CardHeader><CardTitle>Готовность задачи</CardTitle></CardHeader><CardContent className="space-y-5"><ScoreMeter score={task.score} /><div><h2 className="mb-3 text-sm font-semibold">Расшифровка</h2><ScoreBreakdown score={task.score} /></div></CardContent></Card>
+      <Card className={task.score.level === "priority" ? "border-primary/40 bg-primary/[0.025] lg:sticky lg:top-6" : "lg:sticky lg:top-6"}><CardHeader><CardTitle>Готовность задачи</CardTitle></CardHeader><CardContent className="space-y-5"><ScoreMeter score={task.score} /><div><h2 className="mb-3 text-sm font-semibold">Расшифровка</h2><ScoreBreakdown score={task.score} task={task} catalog={db.tasks} /></div></CardContent></Card>
     </div>
   </PagePlaceholder>;
 }
