@@ -117,7 +117,7 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
   return <div className="space-y-5">
     <section className="grid items-center gap-5 rounded-xl border bg-card p-6 lg:grid-cols-[1.5fr_1fr]" aria-label="Рейтинг карточки">
       <div className="space-y-3"><h2 className="text-3xl font-semibold tracking-tight">Предварительный рейтинг: {preview.potential} / 100</h2><LevelBadge level={getLevel(preview.potential)} /><p className="text-sm text-muted-foreground">Оценка полноты карточки. Баллы начисляются только за подтверждённые вами поля.</p></div>
-      <div className="rounded-lg bg-secondary/40 p-4"><ScoreMeter score={score} />{(saving || dirty) && <p className="mt-2 text-xs text-muted-foreground">Показан последний сохранённый балл.</p>}</div>
+      <div className="rounded-lg bg-secondary/40 p-4"><ScoreMeter score={score} /><p className="mt-2 text-xs text-muted-foreground">Показан последний сохранённый балл.</p></div>
     </section>
     {notice && <LevelCelebration key={notice} message={notice} detail={score.level === "priority" ? (published ? "Она выделена в каталоге." : "После публикации она будет выделена в каталоге.") : undefined} />}
     {showScoreHistory && <ScoreHistory history={scoreHistory} />}
@@ -129,14 +129,16 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false, showScor
           <div className="flex items-center justify-between gap-3"><Label htmlFor={`task-${key}`}>{labels[key]}</Label>{card[key].confirmed && card[key].value.trim() && <span className="flex items-center gap-1 text-xs text-emerald-700"><Check className="size-3.5" aria-hidden="true" />подтверждено</span>}</div>
           <Textarea id={`task-${key}`} rows={key === "title" ? 2 : 3} value={card[key].value} onChange={(event) => { void save(editCardField(latest.current, key, event.target.value)); }} />
           {card[key].evidence && <blockquote className="text-xs text-muted-foreground">Источник: «{card[key].evidence}»</blockquote>}
-          {!card[key].confirmed && <p className="text-xs text-muted-foreground">Поле не даёт баллов до подтверждения.</p>}
+          <p className={`text-xs text-muted-foreground ${card[key].confirmed ? "invisible" : ""}`} aria-hidden={card[key].confirmed}>Поле не даёт баллов до подтверждения.</p>
         </div>)}</fieldset>
         <Button disabled={saving || publishing || !hasContent || (!unconfirmed && !dirty)} onClick={confirmCard}>Всё верно — подтвердить карточку</Button>
-        {hasContent && !unconfirmed && !dirty && !saving && <p className="flex items-center gap-1 text-sm text-emerald-700"><Check className="size-4" aria-hidden="true" />Карточка подтверждена</p>}
+        <p className="flex min-h-5 items-center gap-1 text-sm text-emerald-700">
+          {hasContent && !unconfirmed ? <><Check className="size-4 shrink-0" aria-hidden="true" />{saving ? "Сохраняем подтверждённую карточку…" : dirty ? "Подтверждена, ожидает сохранения" : "Карточка подтверждена"}</> : <span className="text-muted-foreground">Проверьте и подтвердите карточку</span>}
+        </p>
         <p className="text-sm text-muted-foreground">Для публикации укажите название и подтвердите карточку. Поля, которые вы редактируете вручную, подтверждаются автоматически; пустые поля не подтверждаются.</p>
         <Button disabled={!canPublish || publishing} onClick={() => void publish()}>{publishing ? "Публикуем…" : published ? "Обновить позицию в каталоге" : "Опубликовать"}</Button>
-        {position && <p role="status" className="font-medium text-primary">Ваша задача на {position.position} месте из {position.total}</p>}
-        {!saving && !dirty && <div className="flex gap-4 text-sm"><Link className="text-primary underline" href={`/business/tasks/${initialTask.id}`}>Карточка и отклики</Link>{published && <Link className="text-primary underline" href={`/catalog/${initialTask.id}`}>Открыть в каталоге</Link>}</div>}
+        <p role="status" className="min-h-6 font-medium text-primary">{position && <>Ваша задача на {position.position} месте из {position.total}</>}</p>
+        <div className={`flex gap-4 text-sm ${saving || dirty ? "invisible" : ""}`} aria-hidden={saving || dirty}><Link className="text-primary underline" href={`/business/tasks/${initialTask.id}`}>Карточка и отклики</Link>{published && <Link className="text-primary underline" href={`/catalog/${initialTask.id}`}>Открыть в каталоге</Link>}</div>
       </CardContent></Card>
       <Card className="lg:sticky lg:top-6"><CardHeader><CardTitle>Что добавить</CardTitle></CardHeader><CardContent className="space-y-6">
         {preview.missing.length ? <ul className="space-y-3 text-sm">{preview.missing.map((item) => <li key={item.label}><p className="font-medium">{item.label} · +{item.points}</p><p className="mt-1 text-muted-foreground">{item.hint.replace(" и подтвердите поле", "")}</p></li>)}</ul> : <p className="text-sm text-emerald-700">Все критерии полноты выполнены.</p>}
