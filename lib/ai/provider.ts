@@ -104,6 +104,61 @@ function validateOutput<T>(options: StructuredRequest<T>, value: unknown) {
   }
 }
 
+type RemoteRequest = Pick<StructuredRequest<unknown>, "operation" | "prompt" | "input" | "jsonSchema">;
+type RemoteOutput = { rawOutput: string; error?: string };
+
+/** Exactly one request, also used by the manual provider smoke check. */
+export async function requestRemoteOnce(provider: RemoteProvider, options: RemoteRequest): Promise<RemoteOutput> {
+  const prefix = provider === "openai" ? "OPENAI" : "NVIDIA";
+  const model = process.env[`${prefix}_MODEL`]?.trim();
+  if (!model) throw new Error(`configuration_error:${prefix}_MODEL`);
+  const client = createRemoteClient(provider);
+  return withDeadline(async (signal) => {
+    const requestOptions = { signal, timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 };
+    if (provider === "openai") {
+      const response = await client.responses.create({
+        model,
+        reasoning: { effort: "low" },
+        stream: false,
+        store: false,
+        instructions: options.prompt,
+        input: [{ role: "user", content: stringify(options.input) }],
+        text: { format: {
+          type: "json_schema",
+          name: `taskready_${options.operation.replaceAll("-", "_")}`,
+          strict: true,
+          schema: options.jsonSchema,
+        } },
+      }, requestOptions);
+      const refusal = response?.output?.flatMap((item) => item.type === "message" ? item.content : [])
+        .find((part) => part.type === "refusal");
+      const rawOutput = response?.output_text || (refusal?.type === "refusal" ? refusal.refusal : stringify(response));
+      if (refusal || response?.incomplete_details?.reason === "content_filter") return { rawOutput, error: "provider_refusal" };
+      if (response?.error || response?.status === "failed") return { rawOutput, error: "provider_response_error" };
+      if (response?.status !== "completed") return { rawOutput, error: "incomplete_response" };
+      return { rawOutput };
+    }
+    const completion = await client.chat.completions.create({
+      model,
+      temperature: PROVIDER_TEMPERATURE,
+      top_p: 1,
+      stream: false,
+      messages: [
+        { role: "system", content: options.prompt },
+        { role: "user", content: stringify(options.input) },
+      ],
+      ...{ nvext: { guided_json: options.jsonSchema } },
+    }, requestOptions);
+    const choice = completion?.choices?.[0];
+    const content = choice?.message?.content;
+    const refusal = choice?.message?.refusal;
+    const rawOutput = typeof content === "string" ? content : typeof refusal === "string" ? refusal : stringify(completion);
+    if (refusal || choice?.finish_reason === "content_filter") return { rawOutput, error: "provider_refusal" };
+    if (choice?.finish_reason !== "stop") return { rawOutput, error: "incomplete_response" };
+    return { rawOutput };
+  });
+}
+
 /** All remote attempts are saved. Returned debug belongs to the provider that supplied the result. */
 export async function runStructured<T>(options: StructuredRequest<T>): Promise<{ result: T; debug: AiDebug }> {
   const callId = `${options.operation}:${randomUUID()}`;
@@ -135,39 +190,21 @@ export async function runStructured<T>(options: StructuredRequest<T>): Promise<{
       await record(provider, 0, options.prompt, "", [`configuration_error:${prefix}_MODEL`]);
       continue;
     }
-    const client = createRemoteClient(provider);
     for (let attempt = 0; attempt <= INVALID_OUTPUT_RETRIES; attempt++) {
       const prompt = attempt === 0 ? options.prompt : `${options.prompt}\nThe previous response did not match the schema. Return one complete JSON object matching the supplied JSON Schema, without Markdown.`;
-      let completion: OpenAI.Chat.Completions.ChatCompletion;
+      let response: RemoteOutput;
       try {
-        completion = await withDeadline((signal) => client.chat.completions.create({
-          model,
-          temperature: PROVIDER_TEMPERATURE,
-          stream: false,
-          messages: [
-            { role: "system", content: prompt },
-            { role: "user", content: stringify(options.input) },
-          ],
-          ...(provider === "openai"
-            ? { response_format: { type: "json_schema" as const, json_schema: { name: `taskready_${options.operation.replaceAll("-", "_")}`, strict: true, schema: options.jsonSchema } } }
-            : { nvext: { guided_json: options.jsonSchema } }),
-        }, { signal, timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 }));
+        response = await requestRemoteOnce(provider, { ...options, prompt });
       } catch (error) {
         const details = errorDetails(error);
         await record(provider, attempt + 1, prompt, details.rawOutput, [details.code]);
         break;
       }
-      const choice = completion?.choices?.[0];
-      const content = choice?.message?.content;
-      const refusal = choice?.message?.refusal;
-      const rawOutput = typeof content === "string" ? content : typeof refusal === "string" ? refusal : stringify(completion);
-      if (choice?.message?.refusal || choice?.finish_reason === "content_filter") {
-        await record(provider, attempt + 1, prompt, rawOutput, ["provider_refusal"]);
+      const { rawOutput } = response;
+      if (response.error) {
+        await record(provider, attempt + 1, prompt, rawOutput, [response.error]);
+        if (response.error === "incomplete_response") continue;
         break;
-      }
-      if (choice?.finish_reason !== "stop") {
-        await record(provider, attempt + 1, prompt, rawOutput, ["incomplete_response"]);
-        continue;
       }
       let value: unknown;
       try { value = JSON.parse(rawOutput); } catch {

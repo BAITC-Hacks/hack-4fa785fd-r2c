@@ -7,18 +7,23 @@ const state = vi.hoisted(() => ({
   persist: vi.fn(),
   logs: [] as AiDebug[],
   clients: [] as { apiKey: string; baseURL: string; timeout: number; maxRetries: number }[],
-  requests: [] as { provider: string; body: Record<string, unknown>; options: { signal: AbortSignal } }[],
+  requests: [] as { provider: string; api: string; body: Record<string, unknown>; options: { signal: AbortSignal } }[],
 }));
 vi.mock("openai", () => ({
   default: class MockOpenAI {
     chat: { completions: { create: (body: Record<string, unknown>, options: { signal: AbortSignal }) => Promise<unknown> } };
+    responses: { create: (body: Record<string, unknown>, options: { signal: AbortSignal }) => Promise<unknown> };
     constructor(config: { apiKey: string; baseURL: string; timeout: number; maxRetries: number }) {
       state.clients.push(config);
       const provider = config.baseURL.includes("nvidia") ? "nvidia" : "openai";
       this.chat = { completions: { create(body, options) {
-        state.requests.push({ provider, body, options });
+        state.requests.push({ provider, api: "chat.completions", body, options });
         return state.complete(provider, body, options);
       } } };
+      this.responses = { create(body, options) {
+        state.requests.push({ provider, api: "responses", body, options });
+        return state.complete(provider, body, options);
+      } };
     }
   },
 }));
@@ -26,7 +31,7 @@ vi.mock("../store", () => ({
   updateDb: (mutator: (db: Database) => unknown) => state.persist(mutator),
 }));
 
-import { AiPersistenceError, AiProcessingError, NVIDIA_BASE_URL, PROVIDER_TIMEOUT_MS, runStructured, type StructuredRequest } from "./provider";
+import { AiPersistenceError, AiProcessingError, NVIDIA_BASE_URL, PROVIDER_TIMEOUT_MS, requestRemoteOnce, runStructured, type StructuredRequest } from "./provider";
 
 const schema = z.strictObject({ value: z.string().nullable() });
 function request(): StructuredRequest<z.infer<typeof schema>> {
@@ -42,6 +47,15 @@ function request(): StructuredRequest<z.infer<typeof schema>> {
 }
 function completion(content = '{"value":"Known user fact"}', finish_reason = "stop", refusal: string | null = null) {
   return { choices: [{ message: { content, refusal }, finish_reason }] };
+}
+function response(content = '{"value":"Known user fact"}', finishReason = "stop", refusal: string | null = null) {
+  return {
+    status: finishReason === "stop" ? "completed" : "incomplete",
+    output_text: content,
+    output: [{ type: "reasoning", summary: [] }, { type: "message", content: refusal ? [{ type: "refusal", refusal }] : [{ type: "output_text", text: content }] }],
+    incomplete_details: finishReason === "stop" ? null : { reason: "max_output_tokens" },
+    error: null,
+  };
 }
 function configureBoth() {
   vi.stubEnv("OPENAI_API_KEY", "test-openai-secret-key");
@@ -70,17 +84,22 @@ describe("structured provider chain", () => {
     expect(output.debug).toMatchObject({ prompt: request().prompt, input: request().input, rawOutput: '{"value":null}', validation: { success: true, errors: [] } });
   });
 
-  it("uses low temperature, strict JSON Schema and no implicit SDK retries", async () => {
+  it("uses Responses API, low reasoning, strict JSON Schema and no sampling parameters", async () => {
     configureBoth();
-    state.complete.mockResolvedValue(completion());
+    state.complete.mockResolvedValue(response());
     const output = await runStructured(request());
     expect(output.debug.provider).toBe("openai");
     expect(state.requests).toHaveLength(1);
     expect(state.requests[0].body).toMatchObject({
-      model: "test-openai-model", temperature: 0.1, stream: false,
-      response_format: { type: "json_schema", json_schema: { strict: true, schema: request().jsonSchema } },
-      messages: [{ role: "system", content: request().prompt }, { role: "user", content: JSON.stringify(request().input) }],
+      model: "test-openai-model", reasoning: { effort: "low" }, stream: false, store: false,
+      text: { format: { type: "json_schema", strict: true, schema: request().jsonSchema } },
+      instructions: request().prompt,
+      input: [{ role: "user", content: JSON.stringify(request().input) }],
     });
+    expect(state.requests[0].api).toBe("responses");
+    expect(state.requests[0].body).not.toHaveProperty("temperature");
+    expect(state.requests[0].body).not.toHaveProperty("top_p");
+    expect(state.requests[0].body).not.toHaveProperty("messages");
     expect(state.clients[0]).toMatchObject({ timeout: 12_000, maxRetries: 0 });
     expect(state.logs[0].rawOutput).toBe('{"value":"Known user fact"}');
   });
@@ -91,15 +110,16 @@ describe("structured provider chain", () => {
     const output = await runStructured(request());
     expect(output.debug.provider).toBe("nvidia");
     expect(state.requests.map((r) => r.provider)).toEqual(["openai", "nvidia"]);
+    expect(state.requests[1].api).toBe("chat.completions");
     expect(state.clients[1].baseURL).toBe(NVIDIA_BASE_URL);
-    expect(state.requests[1].body).toMatchObject({ nvext: { guided_json: request().jsonSchema }, temperature: 0.1 });
+    expect(state.requests[1].body).toMatchObject({ nvext: { guided_json: request().jsonSchema }, temperature: 0.1, top_p: 1 });
     expect(state.logs[0].validation.errors).toEqual(["provider_http_error:429"]);
     expect(state.logs.map((log) => log.provider)).toEqual(["openai", "nvidia"]);
   });
 
   it("retries malformed JSON exactly once and records both raw outputs", async () => {
     configureBoth();
-    state.complete.mockResolvedValueOnce(completion("not json")).mockResolvedValueOnce(completion());
+    state.complete.mockResolvedValueOnce(response("not json")).mockResolvedValueOnce(response());
     const output = await runStructured(request());
     expect(output.debug.provider).toBe("openai");
     expect(state.requests.map((r) => r.provider)).toEqual(["openai", "openai"]);
@@ -109,7 +129,7 @@ describe("structured provider chain", () => {
 
   it("falls through both invalid providers to local with at most four remote attempts", async () => {
     configureBoth();
-    state.complete.mockResolvedValue(completion('{"unexpected":true}'));
+    state.complete.mockImplementation(async (provider) => provider === "openai" ? response('{"unexpected":true}') : completion('{"unexpected":true}'));
     const output = await runStructured(request());
     expect(output.debug.provider).toBe("local");
     expect(state.requests.map((r) => r.provider)).toEqual(["openai", "openai", "nvidia", "nvidia"]);
@@ -135,7 +155,7 @@ describe("structured provider chain", () => {
 
   it("logs refusal and goes to the next provider without a JSON retry", async () => {
     configureBoth();
-    state.complete.mockResolvedValueOnce(completion("", "stop", "refused")).mockResolvedValueOnce(completion());
+    state.complete.mockResolvedValueOnce(response("", "stop", "refused")).mockResolvedValueOnce(completion());
     await runStructured(request());
     expect(state.requests.map((r) => r.provider)).toEqual(["openai", "nvidia"]);
     expect(state.logs[0].validation.errors).toEqual(["provider_refusal"]);
@@ -143,7 +163,7 @@ describe("structured provider chain", () => {
 
   it("treats truncated output as invalid and retries once", async () => {
     configureBoth();
-    state.complete.mockResolvedValueOnce(completion('{"value":', "length")).mockResolvedValueOnce(completion());
+    state.complete.mockResolvedValueOnce(response('{"value":', "length")).mockResolvedValueOnce(response());
     await runStructured(request());
     expect(state.logs[0].validation.errors).toEqual(["incomplete_response"]);
     expect(state.requests).toHaveLength(2);
@@ -151,7 +171,7 @@ describe("structured provider chain", () => {
 
   it("records unsupported evidence and returns only the sanitized result", async () => {
     configureBoth();
-    state.complete.mockResolvedValue(completion('{"value":"invented"}'));
+    state.complete.mockResolvedValue(response('{"value":"invented"}'));
     const input = request();
     input.validate = () => ({ result: { value: null }, rejectedFields: ["data"], errors: ["rejected_unsupported:data"] });
     const output = await runStructured(input);
@@ -160,9 +180,37 @@ describe("structured provider chain", () => {
     expect(state.requests).toHaveLength(1);
   });
 
+  it("switches provider on a failed Responses payload without retrying JSON", async () => {
+    configureBoth();
+    state.complete.mockResolvedValueOnce({ ...response(""), status: "failed", error: { code: "server_error", message: "failure" } })
+      .mockResolvedValueOnce(completion());
+    const output = await runStructured(request());
+    expect(output.debug.provider).toBe("nvidia");
+    expect(state.requests.map((r) => r.provider)).toEqual(["openai", "nvidia"]);
+    expect(state.logs[0].validation.errors).toEqual(["provider_response_error"]);
+  });
+
+  it("handles a Responses content filter as refusal, not a truncation retry", async () => {
+    configureBoth();
+    state.complete.mockResolvedValueOnce({ ...response("", "length"), incomplete_details: { reason: "content_filter" } })
+      .mockResolvedValueOnce(completion());
+    await runStructured(request());
+    expect(state.logs[0].validation.errors).toEqual(["provider_refusal"]);
+    expect(state.requests.map((r) => r.provider)).toEqual(["openai", "nvidia"]);
+  });
+
+  it("allows an isolated probe with exactly one request and no automatic fallback", async () => {
+    configureBoth();
+    state.complete.mockResolvedValue(response("partial", "length"));
+    const output = await requestRemoteOnce("openai", request());
+    expect(output).toEqual({ rawOutput: "partial", error: "incomplete_response" });
+    expect(state.requests).toHaveLength(1);
+    expect(state.requests[0].api).toBe("responses");
+  });
+
   it("does not send paid fallback requests when debug persistence fails", async () => {
     configureBoth();
-    state.complete.mockResolvedValue(completion());
+    state.complete.mockResolvedValue(response());
     state.persist.mockRejectedValue(new Error("disk failure"));
     await expect(runStructured(request())).rejects.toBeInstanceOf(AiPersistenceError);
     expect(state.requests).toHaveLength(1);
