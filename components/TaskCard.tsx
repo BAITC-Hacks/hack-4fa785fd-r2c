@@ -5,14 +5,15 @@ import { Badge } from "@/components/ui/badge";
 import { LevelBadge } from "@/components/LevelBadge";
 
 export function TaskCard({ task, href = `/catalog/${task.id}` }: { task: Task; href?: string }) {
+  const featured = task.score.level === "priority";
   return (
-    <Card className={task.score.level === "priority" ? "border-primary/50" : undefined}>
+    <Card className={featured ? "border-primary bg-primary/[0.035] shadow-md ring-1 ring-primary/15" : undefined}>
       <CardHeader className="space-y-3">
-        <div className="flex items-center justify-between gap-3"><Badge variant="outline">{task.industry}</Badge><span className="text-sm font-semibold tabular-nums">{task.score.total} / 100</span></div>
-        <CardTitle className="text-lg leading-6"><Link className="hover:underline" href={href}>{task.card.title.value || "Задача без названия"}</Link></CardTitle>
+        <div className="flex items-center justify-between gap-3"><Badge variant="outline">{task.industry}</Badge><span className={"text-sm font-semibold tabular-nums " + (featured ? "text-primary" : "")}>{task.score.total} / 100</span></div>
+        <CardTitle className="text-lg leading-6"><Link className="hover:underline" href={href}>{task.card.title.confirmed ? task.card.title.value : "Задача без названия"}</Link></CardTitle>
         <p className="text-sm text-muted-foreground">{task.businessName}</p>
       </CardHeader>
-      <CardContent className="space-y-4"><p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{task.card.need.value || task.draftText}</p><LevelBadge level={task.score.level} /></CardContent>
+      <CardContent className="space-y-4"><p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{task.card.need.confirmed && task.card.need.value ? task.card.need.value : task.draftText}</p><div className="flex flex-wrap items-center gap-2"><LevelBadge level={task.score.level} />{featured && <Badge>В приоритете</Badge>}</div></CardContent>
     </Card>
   );
 }

@@ -1,21 +1,61 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { PagePlaceholder } from "@/components/PagePlaceholder";
+import { ProposalForm } from "@/components/ProposalForm";
+import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { ScoreMeter } from "@/components/ScoreMeter";
+import { LevelBadge } from "@/components/LevelBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { readDb } from "@/lib/store";
+import { RoleSchema, fieldKeys } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+const sections: { title: string; fields: (typeof fieldKeys)[number][] }[] = [
+  { title: "Контекст и потребность", fields: ["context", "need"] },
+  { title: "Пользователи и данные", fields: ["users", "data"] },
+  { title: "Результат и критерии успеха", fields: ["expectedResult", "successCriteria"] },
+  { title: "Ограничения и взаимодействие", fields: ["constraints", "contact", "interactionFormat"] },
+];
+
+const fieldLabels: Record<(typeof fieldKeys)[number], string> = {
+  title: "Название", context: "Контекст", need: "Потребность", users: "Пользователи", data: "Данные и материалы",
+  constraints: "Ограничения", expectedResult: "Ожидаемый результат", successCriteria: "Критерии успеха",
+  contact: "Контакт", interactionFormat: "Формат взаимодействия",
+};
 
 export default async function CatalogTaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return (
-    <PagePlaceholder eyebrow="Открытый каталог / задача" title="Задача для команды" description="Здесь команда сможет изучить постановку задачи и предложить свой подход."
-      action={<Button asChild variant="outline"><Link href="/catalog">Вернуться в каталог</Link></Button>}>
-      <p className="placeholder-notice">Идентификатор маршрута: <code>{id}</code>. Это макет; сведения о задаче ещё не загружаются.</p>
-      <div className="grid grid-cols-[1.4fr_1fr] items-start gap-6"><div className="space-y-6"><Card><CardHeader><CardTitle>Постановка задачи</CardTitle></CardHeader><CardContent className="space-y-5">{["Потребность и контекст", "Пользователи и доступные данные", "Ожидаемый результат и критерии успеха", "Ограничения и взаимодействие"].map((section) => <div key={section} className="border-b pb-4 last:border-0 last:pb-0"><h2 className="text-sm font-medium">{section}</h2><p className="mt-2 text-sm text-muted-foreground">Здесь появятся сведения, подтверждённые бизнесом.</p></div>)}</CardContent></Card><Card><CardContent><ScoreMeter /></CardContent></Card></div>
-        <Card><CardHeader><CardTitle>Предложение команды</CardTitle></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="proposal-idea">Идея решения</Label><Textarea id="proposal-idea" disabled placeholder="Как вы предлагаете решить задачу?" rows={3} /></div><div className="space-y-2"><Label htmlFor="proposal-plan">План работы</Label><Textarea id="proposal-plan" disabled placeholder="Основные этапы и ожидаемый результат" rows={3} /></div><div className="space-y-2"><Label htmlFor="proposal-timeline">Срок</Label><Input id="proposal-timeline" disabled placeholder="Например, две недели" /></div><div className="space-y-2"><Label htmlFor="proposal-prototype">Ссылка на прототип</Label><Input id="proposal-prototype" type="url" disabled placeholder="https://example.com" /></div><Button disabled className="w-full">Отправить отклик</Button><p className="text-xs leading-5 text-muted-foreground">Отправка ещё не подключена. Любая команда сможет откликнуться независимо от рейтинга задачи; исполнителей выбирает бизнес.</p></CardContent></Card>
+  const [db, cookieStore] = await Promise.all([readDb(), cookies()]);
+  const task = db.tasks.find((entry) => entry.id === id && entry.status === "published");
+  if (!task) notFound();
+
+  let selectedTeamId: string | undefined;
+  const savedRole = cookieStore.get("taskready-role")?.value;
+  if (savedRole) {
+    try {
+      const parsedRole = RoleSchema.safeParse(JSON.parse(decodeURIComponent(savedRole)));
+      if (parsedRole.success) {
+        const role = parsedRole.data;
+        if (role.kind === "team" && db.teams.some((team) => team.id === role.teamId)) selectedTeamId = role.teamId;
+      }
+    } catch { /* The proposal form will ask the visitor to choose a team. */ }
+  }
+
+  return <PagePlaceholder placeholder={false} eyebrow="Открытый каталог / задача" title={task.card.title.confirmed ? task.card.title.value : "Задача для команды"} description={task.businessName + " · " + task.industry}
+    action={<Button asChild variant="outline"><Link href="/catalog">Вернуться в каталог</Link></Button>}>
+    {task.score.level === "draft" && <div className="rounded-lg border border-amber-400/40 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-950">Черновик · требует уточнения. Задача остаётся открытой для откликов.</div>}
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.8fr)]">
+      <div className="space-y-6">
+        <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>О задаче</CardTitle><LevelBadge level={task.score.level} /></div><p className="text-sm text-muted-foreground">Опубликована {new Date(task.publishedAt ?? task.createdAt).toLocaleDateString("ru-RU")}</p></CardHeader><CardContent className="space-y-6">
+          {sections.filter((section) => section.fields.some((field) => task.card[field].confirmed && task.card[field].value.trim())).map((section) => <section key={section.title} className="space-y-4 border-b pb-5 last:border-0 last:pb-0"><h2 className="text-sm font-semibold">{section.title}</h2>{section.fields.map((field) => task.card[field].confirmed && task.card[field].value.trim() && <div key={field}><h3 className="text-xs font-medium text-muted-foreground">{fieldLabels[field]}</h3><p className="mt-1 whitespace-pre-wrap text-sm leading-6">{task.card[field].value}</p></div>)}</section>)}
+          {task.tags.length > 0 && <div className="flex flex-wrap gap-2">{task.tags.map((tag) => <span key={tag} className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">{tag}</span>)}</div>}
+        </CardContent></Card>
+        <ProposalForm taskId={task.id} teams={db.teams} selectedTeamId={selectedTeamId} />
       </div>
-    </PagePlaceholder>
-  );
+      <Card className={task.score.level === "priority" ? "border-primary/40 bg-primary/[0.025] lg:sticky lg:top-6" : "lg:sticky lg:top-6"}><CardHeader><CardTitle>Готовность задачи</CardTitle></CardHeader><CardContent className="space-y-5"><ScoreMeter score={task.score} /><div><h2 className="mb-3 text-sm font-semibold">Расшифровка</h2><ScoreBreakdown score={task.score} /></div></CardContent></Card>
+    </div>
+  </PagePlaceholder>;
 }

@@ -1,6 +1,13 @@
 import type { ScoreResult } from "@/lib/types";
 import { LevelBadge } from "@/components/LevelBadge";
 
+const levelColor: Record<ScoreResult["level"], string> = {
+  draft: "bg-amber-500",
+  workable: "bg-yellow-500",
+  ready: "bg-emerald-500",
+  priority: "bg-emerald-700",
+};
+
 export function ScoreMeter({ score }: { score?: ScoreResult }) {
   return (
     <section aria-label="Рейтинг готовности" className="space-y-4">
@@ -9,7 +16,7 @@ export function ScoreMeter({ score }: { score?: ScoreResult }) {
         {score && <LevelBadge level={score.level} />}
       </div>
       <div role={score ? "meter" : undefined} aria-label={score ? "Подтверждённые баллы" : undefined} aria-valuenow={score?.total} aria-valuemin={score ? 0 : undefined} aria-valuemax={score ? 100 : undefined} className="h-2 overflow-hidden rounded-full bg-secondary">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${score?.total ?? 0}%` }} />
+        <div className={`h-full rounded-full transition-[width] duration-300 ${score ? levelColor[score.level] : "bg-primary"}`} style={{ width: `${score?.total ?? 0}%` }} />
       </div>
       <p className="text-xs leading-5 text-muted-foreground">{score ? `После подтверждения всех заполненных полей: ${score.potential} / 100.` : "Рейтинг появится после подключения карточки. Баллы начисляются только за подтверждённые сведения."}</p>
     </section>
