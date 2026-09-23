@@ -9,6 +9,8 @@ import { calculateScore } from "@/lib/scoring";
 import { getLevel } from "@/lib/levels";
 import { confirmNonemptyFields, editCardField, levelUpgradeMessage } from "@/lib/card-confirmation";
 import { LevelBadge } from "./LevelBadge";
+import { ScoreMeter } from "./ScoreMeter";
+import { ScoreHistory } from "./ScoreHistory";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -21,7 +23,7 @@ const labels: Record<FieldKey, string> = {
   successCriteria: "Критерии успеха", contact: "Контакт", interactionFormat: "Формат взаимодействия",
 };
 
-export function TaskEditor({ initialTask, redirectAfterPublish = false }: { initialTask: Task; redirectAfterPublish?: boolean }) {
+export function TaskEditor({ initialTask, redirectAfterPublish = false, showScoreHistory = false }: { initialTask: Task; redirectAfterPublish?: boolean; showScoreHistory?: boolean }) {
   const router = useRouter();
   const [card, setCard] = useState(initialTask.card);
   const latest = useRef(card);
@@ -37,6 +39,7 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false }: { init
   const [notice, setNotice] = useState("");
   const confirmLock = useRef(false);
   const [score, setScore] = useState(initialTask.score);
+  const [scoreHistory, setScoreHistory] = useState(initialTask.scoreHistory);
   const savedScore = useRef(initialTask.score);
   // A disposable preview only: these flags are never saved without a human action.
   const preview = useMemo(() => calculateScore(confirmNonemptyFields(card)), [card]);
@@ -55,16 +58,18 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false }: { init
   function save(next: TaskCard) {
     const revision = ++version.current;
     latest.current = next;
-    setCard(next); setDirty(true); setSaving(true); setError(""); setNotice(""); setPosition(null);
+    setCard(next); setDirty(true); setSaving(true); setError(""); setPosition(null);
     // Full card snapshots must reach the server in edit order.
     queue.current = queue.current.then(async () => {
       try {
         const saved = await saveTaskCard(initialTask.id, next);
         if (revision === version.current) {
-          setNotice(levelUpgradeMessage(savedScore.current.level, saved.score.level));
+          const upgrade = levelUpgradeMessage(savedScore.current.level, saved.score.level);
+          if (upgrade) setNotice(upgrade);
           savedScore.current = saved.score;
           latest.current = saved.card; setCard(saved.card);
           setScore(saved.score); setDirty(false); setError("");
+          setScoreHistory(saved.scoreHistory);
         }
       } catch (cause) {
         if (revision === version.current) setError(cause instanceof Error ? cause.message : "Не удалось сохранить карточку.");
@@ -96,9 +101,10 @@ export function TaskEditor({ initialTask, redirectAfterPublish = false }: { init
   return <div className="space-y-5">
     <section className="grid items-center gap-5 rounded-xl border bg-card p-6 lg:grid-cols-[1.5fr_1fr]" aria-label="Рейтинг карточки">
       <div className="space-y-3"><h2 className="text-3xl font-semibold tracking-tight">Предварительный рейтинг: {preview.potential} / 100</h2><LevelBadge level={getLevel(preview.potential)} /><p className="text-sm text-muted-foreground">Оценка полноты карточки. Баллы начисляются только за подтверждённые вами поля.</p></div>
-      <div className="rounded-lg bg-secondary/40 p-4"><p className="text-sm text-muted-foreground">Текущий подтверждённый балл</p><p className="mt-2 text-3xl font-semibold tabular-nums">{score.total} / 100</p><div className="mt-2"><LevelBadge level={score.level} /></div>{(saving || dirty) && <p className="mt-2 text-xs text-muted-foreground">Показан последний сохранённый балл.</p>}</div>
+      <div className="rounded-lg bg-secondary/40 p-4"><ScoreMeter score={score} />{(saving || dirty) && <p className="mt-2 text-xs text-muted-foreground">Показан последний сохранённый балл.</p>}</div>
     </section>
-    {notice && <p role="status" className="rounded-lg bg-emerald-50 p-3 font-medium text-emerald-800">{notice}</p>}
+    {notice && <div role="status" aria-live="polite" className="fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 rounded-2xl border border-emerald-300 bg-emerald-950 p-5 text-white shadow-xl"><p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Новый уровень готовности</p><p className="mt-2 text-lg font-semibold">{notice}{score.level === "priority" && (published ? " Она выделена в каталоге." : " После публикации она будет выделена в каталоге.")}</p></div>}
+    {showScoreHistory && <ScoreHistory history={scoreHistory} />}
     <p role="status" className="text-sm text-muted-foreground">{saving ? "Сохраняем изменения…" : dirty ? "Есть несохранённые изменения" : "Все изменения сохранены"} · {published ? "Опубликована" : "Черновик"}</p>
     {error && <div role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">{error}{dirty && <Button className="ml-3" variant="outline" disabled={saving} onClick={() => save(latest.current)}>Повторить сохранение</Button>}</div>}
     <div className="grid items-start gap-6 lg:grid-cols-[1.5fr_1fr]">

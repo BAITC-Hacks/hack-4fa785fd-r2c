@@ -9,6 +9,13 @@ const levelColor: Record<ScoreResult["level"], string> = {
 };
 
 export function ScoreMeter({ score }: { score?: ScoreResult }) {
+  const nextLevel = score && (score.total < 40
+    ? { label: "Рабочая", remaining: 40 - score.total }
+    : score.total < 70
+      ? { label: "Готовая", remaining: 70 - score.total }
+      : score.total < 90
+        ? { label: "Приоритетная", remaining: 90 - score.total }
+        : null);
   return (
     <section aria-label="Рейтинг готовности" className="space-y-4">
       <div className="flex items-end justify-between gap-4">
@@ -18,6 +25,7 @@ export function ScoreMeter({ score }: { score?: ScoreResult }) {
       <div role={score ? "meter" : undefined} aria-label={score ? "Подтверждённые баллы" : undefined} aria-valuenow={score?.total} aria-valuemin={score ? 0 : undefined} aria-valuemax={score ? 100 : undefined} className="h-2 overflow-hidden rounded-full bg-secondary">
         <div className={`h-full rounded-full transition-[width] duration-300 ${score ? levelColor[score.level] : "bg-primary"}`} style={{ width: `${score?.total ?? 0}%` }} />
       </div>
+      {score && <p className="text-sm font-medium text-emerald-800">{nextLevel ? `До уровня «${nextLevel.label}» осталось ${nextLevel.remaining} баллов` : "Максимальный уровень"}</p>}
       <p className="text-xs leading-5 text-muted-foreground">{score ? `После подтверждения всех заполненных полей: ${score.potential} / 100.` : "Рейтинг появится после подключения карточки. Баллы начисляются только за подтверждённые сведения."}</p>
     </section>
   );

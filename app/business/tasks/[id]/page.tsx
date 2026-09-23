@@ -20,7 +20,7 @@ export default async function BusinessTaskPage({ params }: { params: Promise<{ i
     action={<Button asChild variant="outline"><Link href="/business/tasks">К моим задачам</Link></Button>}>
     <div className="flex items-center gap-3"><Badge variant="secondary">{task.status === "published" ? "Опубликована" : "Не опубликована"}</Badge>{task.status === "published" && <Link className="text-sm text-primary underline" href={`/catalog/${task.id}`}>Открыть в каталоге</Link>}</div>
     {task.status === "published" && <p role="status" className="font-medium text-primary">Ваша задача на {catalog.findIndex((entry) => entry.id === task.id) + 1} месте из {catalog.length}</p>}
-    <TaskEditor key={task.id} initialTask={task} />
+    <TaskEditor key={task.id} initialTask={task} showScoreHistory />
     <BusinessProposals key={task.id} taskId={task.id} />
   </PagePlaceholder>;
 }
