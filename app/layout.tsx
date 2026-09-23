@@ -9,8 +9,8 @@ import { RoleSchema, type Role } from "@/lib/types";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "TaskReady — каркас проекта", template: "%s · TaskReady" },
-  description: "Каркас платформы подготовки бизнес-задач и открытого выбора студенческих команд.",
+  title: { default: "TaskReady — задачи и команды", template: "%s · TaskReady" },
+  description: "Платформа подготовки бизнес-задач и открытого выбора студенческих команд.",
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -36,7 +36,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <Navigation /><RoleSwitcher key={JSON.stringify(role)} initialRole={role} teams={db.teams} />
         </div>
       </header>
-      <div className="border-b bg-secondary/50"><div className="page-shell flex h-11 items-center justify-between text-xs text-muted-foreground"><span>HackAlem AI · AI Sana</span><Badge variant="outline" className="border-primary/20 bg-card/50 text-primary">Каркас проекта</Badge><span>Бизнес × студенческие команды</span></div></div>
+      <div className="border-b bg-secondary/50"><div className="page-shell flex h-11 items-center justify-between text-xs text-muted-foreground"><span>HackAlem AI · AI Sana</span><Badge variant="outline" className="border-primary/20 bg-card/50 text-primary">От задачи к результату</Badge><span>Бизнес × студенческие команды</span></div></div>
       <main className="page-shell min-h-[calc(100vh-207px)] py-10">{children}</main>
       <footer className="page-shell flex h-20 items-center justify-between border-t text-xs text-muted-foreground"><span>TaskReady · подготовка задач к совместной работе</span><span>Этап 01 / структура и интерфейсы</span></footer>
     </body></html>
