@@ -1,22 +1,33 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { PagePlaceholder } from "@/components/PagePlaceholder";
+import { BusinessProposals } from "@/components/BusinessProposals";
 import { ScoreMeter } from "@/components/ScoreMeter";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
-import { AiDebugPanel } from "@/components/AiDebugPanel";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { readDb } from "@/lib/store";
+import { fieldKeys, type FieldKey } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+const labels: Record<FieldKey, string> = {
+  title: "Название", context: "Контекст", need: "Потребность", users: "Пользователи", data: "Данные и материалы",
+  constraints: "Ограничения", expectedResult: "Ожидаемый результат", successCriteria: "Критерии успеха",
+  contact: "Контакт", interactionFormat: "Формат взаимодействия",
+};
 
 export default async function BusinessTaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return (
-    <PagePlaceholder eyebrow="Кабинет бизнеса / задача" title="Карточка задачи" description="Макет редактирования, подтверждения полей и работы с предложениями команд."
-      action={<Button asChild variant="outline"><Link href="/business/tasks">К моим задачам</Link></Button>}>
-      <p className="placeholder-notice">Идентификатор маршрута: <code>{id}</code>. Загрузка задачи и действия с ней пока не подключены.</p>
-      <div className="grid grid-cols-[1.5fr_1fr] items-start gap-6"><div className="space-y-6">
-        <Card><CardHeader><CardTitle>Сведения о задаче</CardTitle></CardHeader><CardContent><dl className="divide-y">{["Название", "Контекст", "Потребность", "Пользователи", "Данные и материалы", "Ограничения", "Ожидаемый результат", "Критерии успеха", "Контакт", "Формат взаимодействия"].map((field) => <div key={field} className="grid grid-cols-[180px_1fr] gap-4 py-3 text-sm"><dt className="font-medium">{field}</dt><dd className="text-muted-foreground">Поле карточки ещё не подключено</dd></div>)}</dl><div className="mt-5 flex gap-2"><Button disabled>Сохранить изменения</Button><Button variant="outline" disabled>Опубликовать</Button></div><p className="mt-3 text-xs text-muted-foreground">Редактирование, подтверждение и публикация будут подключены к API.</p></CardContent></Card>
-        <Card><CardHeader><CardTitle>Отклики команд</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm leading-6 text-muted-foreground">Здесь бизнес сможет сравнить предложения и вручную выбрать одну, несколько или ни одной команды.</p><div className="flex flex-wrap gap-2"><Button size="sm" disabled>Принять отклик</Button><Button variant="outline" size="sm" disabled>Отклонить</Button><Button variant="outline" size="sm" disabled>Подтвердить этап · +50</Button></div><p className="text-xs text-muted-foreground">Список откликов и начисление баллов пока не подключены.</p></CardContent></Card>
-        <AiDebugPanel />
-      </div><Card className="sticky top-6"><CardContent className="space-y-6"><ScoreMeter /><div><h2 className="mb-2 text-sm font-semibold">Из чего складывается рейтинг</h2><ScoreBreakdown /></div></CardContent></Card></div>
-    </PagePlaceholder>
-  );
+  const { tasks } = await readDb();
+  const task = tasks.find((entry) => entry.id === id);
+  if (!task) notFound();
+  return <PagePlaceholder placeholder={false} eyebrow="Кабинет бизнеса / задача" title={task.card.title.value.trim() || "Задача без названия"} description={`${task.businessName} · ${task.industry}`}
+    action={<Button asChild variant="outline"><Link href="/business/tasks">К моим задачам</Link></Button>}>
+    <div className="flex items-center gap-3"><Badge variant="secondary">{task.status === "published" ? "Опубликована" : "Не опубликована"}</Badge>{task.status === "published" && <Link className="text-sm text-primary underline" href={`/catalog/${task.id}`}>Открыть в каталоге</Link>}</div>
+    <div className="grid grid-cols-[1.5fr_1fr] items-start gap-6"><div className="space-y-6">
+      <Card><CardHeader><CardTitle>Сведения о задаче</CardTitle></CardHeader><CardContent><dl className="divide-y">{fieldKeys.map((key) => <div key={key} className="grid grid-cols-[160px_1fr] gap-4 py-3 text-sm"><dt className="font-medium">{labels[key]}</dt><dd className="space-y-1"><p className="whitespace-pre-wrap break-words">{task.card[key].value.trim() || "Не заполнено"}</p><p className="text-xs text-muted-foreground">{task.card[key].confirmed ? "Подтверждено" : "Не подтверждено"}</p>{task.card[key].evidence && <blockquote className="border-l-2 pl-3 text-xs text-muted-foreground">{task.card[key].evidence}</blockquote>}</dd></div>)}</dl></CardContent></Card>
+      <BusinessProposals key={task.id} taskId={task.id} />
+    </div><Card className="sticky top-6"><CardContent className="space-y-6"><ScoreMeter score={task.score} /><div><h2 className="mb-2 text-sm font-semibold">Из чего складывается рейтинг</h2><ScoreBreakdown score={task.score} /></div></CardContent></Card></div>
+  </PagePlaceholder>;
 }
